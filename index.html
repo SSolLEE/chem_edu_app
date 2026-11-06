@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>아이오딘 시계 반응 실험 데이터 수집기</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+        * {
+            font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+        }
+        .gradient-bg {
+            background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 50%, #312e81 100%);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 pb-12">
+
+    <!-- Header Section -->
+    <header class="gradient-bg text-white shadow-xl">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <div class="inline-flex items-center gap-2 bg-indigo-500/30 text-indigo-200 text-xs px-3 py-1 rounded-full font-medium mb-2 border border-indigo-400/30">
+                        <i data-lucide="flask-conical" class="w-3.5 h-3.5"></i> 아이오딘 시계반응 1~2차시 연계 탐구 웹앱
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">🧪 시계 반응 데이터 수집 & AI 분석기</h1>
+                    <p class="text-indigo-200 text-sm mt-1">농도 측정부터 구글 코랩(Colab) 시각화 및 제미나이(Gemini) 분석까지 연결합니다.</p>
+                </div>
+                
+                <!-- Group Selection & Meta -->
+                <div class="flex items-center gap-3 bg-white/10 p-3 rounded-xl border border-white/20">
+                    <div>
+                        <label for="groupSelect" class="block text-xs text-indigo-200 font-medium mb-1">우리 모둠 선택</label>
+                        <select id="groupSelect" class="bg-slate-900/80 text-white font-bold text-lg rounded-lg border border-indigo-400/50 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                            <option value="1">1 모둠</option>
+                            <option value="2">2 모둠</option>
+                            <option value="3">3 모둠</option>
+                            <option value="4">4 모둠</option>
+                            <option value="5">5 모둠</option>
+                            <option value="6">6 모둠</option>
+                            <option value="7">7 모둠</option>
+                            <option value="8">8 모둠</option>
+                        </select>
+                    </div>
+                    <div class="h-8 w-px bg-white/20 my-auto"></div>
+                    <div>
+                        <span class="block text-xs text-indigo-200 font-medium">실험 온도</span>
+                        <input type="number" id="tempInput" value="20" class="w-16 bg-slate-900/80 text-white text-center text-sm font-semibold rounded-lg border border-indigo-400/50 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+                        <span class="text-xs text-indigo-200">°C</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Navigation for 1st & 2nd Lesson -->
+            <div class="flex gap-2 mt-6 border-b border-indigo-400/30">
+                <button id="tab1Btn" onclick="switchTab(1)" class="px-4 py-2 text-sm font-bold border-b-2 border-white text-white flex items-center gap-2">
+                    <i data-lucide="timer" class="w-4 h-4"></i> 1차시: 데이터 수집 & 스톱워치
+                </button>
+                <button id="tab2Btn" onclick="switchTab(2)" class="px-4 py-2 text-sm font-medium border-b-2 border-transparent text-indigo-200 hover:text-white flex items-center gap-2">
+                    <i data-lucide="code-2" class="w-4 h-4"></i> 2차시: Colab & Gemini AI 데이터 분석
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+
+        <!-- TAB 1: 1차시 수집 & 측정 (View Section) -->
+        <div id="tab1Content" class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- LEFT COLUMN: Timer & Data Entry (5 cols on lg) -->
+            <section class="lg:col-span-5 space-y-6">
+                <!-- Stopwatch Widget -->
+                <div class="glass-card rounded-2xl p-6 shadow-md border border-slate-200">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i data-lucide="timer" class="text-indigo-600"></i> 정밀 반응 시간 측정 (스톱워치)
+                        </h2>
+                        <span id="timerStatus" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">대기 중</span>
+                    </div>
+
+                    <!-- Digital Display -->
+                    <div class="bg-slate-900 text-emerald-400 rounded-2xl py-8 text-center shadow-inner font-mono relative overflow-hidden my-4 border-2 border-slate-700">
+                        <div id="timeDisplay" class="text-5xl sm:text-6xl font-extrabold tracking-wider">00:00.00</div>
+                        <div class="text-xs text-slate-400 mt-2 font-sans">분 : 초 . 1/100초</div>
+                    </div>
+
+                    <!-- Timer Controls -->
+                    <div class="grid grid-cols-3 gap-3 mb-4">
+                        <button id="startBtn" onclick="startTimer()" class="flex items-center justify-center gap-1.5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl transition shadow-md active:scale-95">
+                            <i data-lucide="play" class="w-4 h-4"></i> 시작
+                        </button>
+                        <button id="stopBtn" onclick="stopTimer()" disabled class="flex items-center justify-center gap-1.5 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl transition shadow-md opacity-50 cursor-not-allowed active:scale-95">
+                            <i data-lucide="square" class="w-4 h-4"></i> 변색 정지
+                        </button>
+                        <button id="resetBtn" onclick="resetTimer()" class="flex items-center justify-center gap-1.5 py-3 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded-xl transition shadow-md active:scale-95">
+                            <i data-lucide="rotate-ccw" class="w-4 h-4"></i> 리셋
+                        </button>
+                    </div>
+
+                    <!-- Record Quick Apply -->
+                    <div class="bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+                        <label class="block text-xs font-bold text-indigo-900 mb-1.5">측정값을 바로 테이블에 기록하기</label>
+                        <div class="flex gap-2">
+                            <select id="targetCondition" class="bg-white text-slate-800 text-xs font-semibold rounded-lg border border-indigo-200 px-2 py-2 flex-grow focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="0">시험관 (가) - KIO₃ 3.0mL</option>
+                                <option value="1">시험관 (나) - KIO₃ 6.0mL</option>
+                                <option value="2">시험관 (다) - KIO₃ 9.0mL</option>
+                                <option value="3">시험관 (라) - KIO₃ 12.0mL</option>
+                            </select>
+                            <select id="targetTrial" class="bg-white text-slate-800 text-xs font-semibold rounded-lg border border-indigo-200 px-2 py-1.5 w-24">
+                                <option value="1">1차</option>
+                                <option value="2">2차</option>
+                                <option value="3">3차</option>
+                            </select>
+                            <button onclick="applyTimerToTable()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-2 rounded-lg transition shrink-0">
+                                기록
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Experiment Guide & Quick Tips -->
+                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 shadow-sm">
+                    <h3 class="font-bold text-amber-900 flex items-center gap-2 text-sm mb-2">
+                        <i data-lucide="lightbulb" class="text-amber-600"></i> 실험 조건 및 TIP
+                    </h3>
+                    <ul class="text-xs text-amber-800 space-y-1.5 list-disc pl-4 leading-relaxed">
+                        <li><strong>시험관 (가):</strong> KIO₃ 3.0mL + 증류수 9.0mL / NaHSO₃ 9.0mL + 녹말 2.0mL</li>
+                        <li><strong>시험관 (나):</strong> KIO₃ 6.0mL + 증류수 6.0mL / NaHSO₃ 9.0mL + 녹말 2.0mL</li>
+                        <li><strong>시험관 (다):</strong> KIO₃ 9.0mL + 증류수 3.0mL / NaHSO₃ 9.0mL + 녹말 2.0mL</li>
+                        <li><strong>시험관 (라):</strong> KIO₃ 12.0mL + 증류수 0.0mL / NaHSO₃ 9.0mL + 녹말 2.0mL</li>
+                        <li>전체 혼합 용액 부피는 <strong>23.0 mL로 동일</strong>하며 변색 정지 순간 타이머를 누르세요!</li>
+                    </ul>
+                </div>
+            </section>
+
+            <!-- RIGHT COLUMN: Data Table & Chart (7 cols on lg) -->
+            <section class="lg:col-span-7 space-y-6">
+                <!-- Data Table Card -->
+                <div class="glass-card rounded-2xl p-6 shadow-md border border-slate-200 overflow-hidden">
+                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                                <i data-lucide="table" class="text-indigo-600"></i> 시험관별 반응 데이터 및 속도 분석표
+                            </h2>
+                            <p class="text-xs text-slate-500">KIO₃ 초기 농도, 평균 시간, 상대 속도가 자동 계산됩니다.</p>
+                        </div>
+                        <button onclick="resetAllData()" class="text-xs text-slate-500 hover:text-rose-600 underline flex items-center gap-1 self-start sm:self-center">
+                            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i> 초기화
+                        </button>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left text-xs border-collapse min-w-[600px]">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 border-b border-slate-200">
+                                    <th class="p-2.5 font-bold">시험관</th>
+                                    <th class="p-2.5 font-bold">용액 조성 (가지A / 가지B)</th>
+                                    <th class="p-2.5 font-bold text-center">KIO₃ 초기농도(M)</th>
+                                    <th class="p-2.5 font-bold text-center text-indigo-700">1차(s)</th>
+                                    <th class="p-2.5 font-bold text-center text-indigo-700">2차(s)</th>
+                                    <th class="p-2.5 font-bold text-center text-indigo-700">3차(s)</th>
+                                    <th class="p-2.5 font-bold text-center bg-indigo-50 text-indigo-900">평균 시간(s)</th>
+                                    <th class="p-2.5 font-bold text-center bg-emerald-50 text-emerald-900">반응 속도 상대값</th>
+                                </tr>
+                            </thead>
+                            <tbody id="dataTableBody">
+                                <!-- JS Dynamically Generated Rows -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Graph Section -->
+                <div class="glass-card rounded-2xl p-6 shadow-md border border-slate-200">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i data-lucide="line-chart" class="text-indigo-600"></i> 농도-반응 시간/속도 그래프
+                        </h2>
+                        <div class="flex bg-slate-100 p-1 rounded-lg text-xs font-semibold">
+                            <button id="btnShowTime" onclick="toggleGraphType('time')" class="px-3 py-1 rounded-md bg-white text-indigo-600 shadow-sm">반응 시간(s)</button>
+                            <button id="btnShowRate" onclick="toggleGraphType('rate')" class="px-3 py-1 rounded-md text-slate-600 hover:text-slate-900">반응 속도 상대값</button>
+                        </div>
+                    </div>
+
+                    <div class="relative h-64 sm:h-72 w-full">
+                        <canvas id="reactionChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Sharing & Padlet Export Section -->
+                <div class="glass-card rounded-2xl p-6 shadow-md border border-slate-200 space-y-4">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+                            <i data-lucide="share-2" class="text-indigo-600"></i> 패들렛(Padlet) 1차시 공유 요약
+                        </h2>
+                        <button onclick="switchTab(2)" class="text-xs bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                            2차시 분석 단계로 이동 <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+                        </button>
+                    </div>
+
+                    <div id="captureArea" class="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white p-5 rounded-xl shadow-lg border border-indigo-500/30">
+                        <div class="flex justify-between items-start border-b border-white/10 pb-3 mb-3">
+                            <div>
+                                <span id="cardGroupBadge" class="bg-indigo-500 text-white text-xs font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">1 모둠</span>
+                                <h3 class="text-base font-bold text-white mt-1">아이오딘 시계반응 데이터 요약 카드</h3>
+                            </div>
+                            <span id="cardDate" class="text-[10px] text-indigo-200">2026.11.05</span>
+                        </div>
+
+                        <div id="cardSummaryText" class="grid grid-cols-2 gap-2 text-xs font-mono">
+                            <!-- JS populated summary -->
+                        </div>
+                    </div>
+
+                    <button onclick="copySummaryToClipboard()" class="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition shadow-md">
+                        <i data-lucide="copy" class="w-4 h-4"></i> 요약 텍스트 복사 (패들렛 게시용)
+                    </button>
+                </div>
+            </section>
+        </div>
+
+        <!-- TAB 2: 2차시 Colab & Gemini AI 분석 모듈 (Hidden initially) -->
+        <div id="tab2Content" class="hidden space-y-6">
+            
+            <!-- Step Guide Header -->
+            <div class="bg-indigo-900 text-white p-6 rounded-2xl shadow-lg border border-indigo-700/50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <span class="bg-indigo-500 text-xs font-bold px-3 py-1 rounded-full text-indigo-100">2차시 학습 활동</span>
+                    <h2 class="text-xl font-bold mt-2">구글 코랩(Colab) 산점도 도출 & Gemini AI 상관관계 해석</h2>
+                    <p class="text-xs text-indigo-200 mt-1">수집된 데이터의 이상치를 점검한 뒤, 파이썬 코드 시각화 및 제미나이 프롬프트를 활용하세요.</p>
+                </div>
+                <a href="https://colab.research.google.com" target="_blank" class="bg-amber-400 hover:bg-amber-500 text-slate-900 font-extrabold text-xs px-4 py-2.5 rounded-xl transition flex items-center gap-2 shrink-0">
+                    <i data-lucide="external-link" class="w-4 h-4"></i> Google Colab 열기
+                </a>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                <!-- Step 1: Data Check & Colab Code Generation -->
+                <div class="glass-card rounded-2xl p-6 shadow-md border border-slate-200 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="font-bold text-slate-900 flex items-center gap-2 text-base">
+                            <span class="bg-indigo-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">1</span>
+                            데이터 검증 및 Colab 파이썬 코드
+                        </h3>
+                        <span id="dataStatusBadge" class="text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800">결측치 없음</span>
+                    </div>
+
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        1차시 수집 데이터가 코랩 파이썬 실행 코드로 변환되었습니다. 이상치(갑자기 튀는 값)가 있는지 확인 후 코드를 복사해 Colab에 붙여넣으세요.
+                    </p>
+
+                    <!-- Python Code Box -->
+                    <div class="relative">
+                        <pre class="bg-slate-900 text-slate-100 p-4 rounded-xl text-xs font-mono overflow-x-auto h-64 border border-slate-800" id="pythonCodeDisplay"></pre>
+                        <button onclick="copyPythonCode()" class="absolute top-3 right-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition flex items-center gap-1">
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i> 파이썬 코드 복사
+                        </button>
+                    </div>
+
+                    <div class="text-xs bg-slate-50 p-3 rounded-lg border border-slate-200 text-slate-600">
+                        <strong>💡 Colab 실행 방법:</strong> Google Colab에서 <code>[+ 코드]</code> 버튼을 누르고 복사한 코드를 붙여넣은 뒤 <code>Ctrl + Enter</code>로 실행하여 산점도와 추세선 수식을 도출합니다.
+                    </div>
+                </div>
+
+                <!-- Step 2: Gemini Prompt & Correlation Interpretation -->
+                <div class="glass-card rounded-2xl p-6 shadow-md border border-slate-200 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h3 class="font-bold text-slate-900 flex items-center gap-2 text-base">
+                            <span class="bg-purple-600 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">2</span>
+                            제미나이(Gemini) 기울기·추세선 질의 프롬프트
+                        </h3>
+                        <span class="text-xs bg-purple-100 text-purple-800 font-bold px-2.5 py-1 rounded-full">AI 토의 준비</span>
+                    </div>
+
+                    <p class="text-xs text-slate-600 leading-relaxed">
+                        Colab에서 도출된 추세선 수식(기울기, $R^2$)을 바탕으로 Gemini에 과학적 의미를 질의하는 맞춤 프롬프트입니다.
+                    </p>
+
+                    <div class="space-y-2">
+                        <label class="block text-xs font-bold text-slate-700">Colab에서 얻은 추세선 수식 및 R² 입력 (선택사항):</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <input type="text" id="trendFormulaInput" placeholder="예: y = 0.12x + 0.01" class="w-full text-xs p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-400">
+                            <input type="text" id="rSquaredInput" placeholder="예: R² = 0.98" class="w-full text-xs p-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-400">
+                        </div>
+                    </div>
+
+                    <textarea id="tab2GeminiPromptText" readonly class="w-full h-44 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-700 focus:outline-none resize-none"></textarea>
+
+                    <div class="flex gap-2">
+                        <button onclick="updateTab2GeminiPrompt()" class="bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold px-3 py-2 rounded-xl transition">
+                            수식 반영 업데이트
+                        </button>
+                        <button onclick="copyTab2GeminiPrompt()" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition flex items-center justify-center gap-1.5">
+                            <i data-lucide="sparkles" class="w-4 h-4"></i> Gemini 질문 프롬프트 복사
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+
+    </main>
+
+    <!-- Custom Modal for AI Prompt (Legacy fallback compatibility) -->
+    <div id="aiPromptModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <i data-lucide="bot" class="text-purple-600"></i> Gemini 데이터 분석 질문 프롬프트
+                </h3>
+                <button onclick="closeGeminiPromptModal()" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <p class="text-xs text-slate-600">
+                아래 생성된 프롬프트를 복사하여 2차시 활동 시 Gemini에 질문하세요.
+            </p>
+
+            <textarea id="aiPromptTextarea" readonly class="w-full h-40 bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-700 focus:outline-none resize-none"></textarea>
+
+            <div class="flex gap-2 justify-end">
+                <button onclick="copyAiPrompt()" class="bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition flex items-center gap-1.5">
+                    <i data-lucide="copy" class="w-3.5 h-3.5"></i> 프롬프트 복사
+                </button>
+                <button onclick="closeGeminiPromptModal()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold px-4 py-2 rounded-xl transition">
+                    닫기
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 transform translate-y-20 opacity-0 transition-all duration-300 z-50 text-xs font-medium border border-slate-700">
+        <i data-lucide="check-circle-2" class="text-emerald-400 w-4 h-4"></i>
+        <span id="toastMessage">클립보드에 복사되었습니다!</span>
+    </div>
+
+    <!-- Application Script Logic -->
+    <script>
+        // Initial Dataset Configuration matching image specs
+        const defaultConditions = [
+            { 
+                id: 1, 
+                name: '시험관 (가)', 
+                kio3Vol: 3.0, 
+                waterVol: 9.0, 
+                starchVol: 2.0, 
+                nahso3Vol: 9.0,
+                totalVol: 23.0,
+                trials: [null, null, null] 
+            },
+            { 
+                id: 2, 
+                name: '시험관 (나)', 
+                kio3Vol: 6.0, 
+                waterVol: 6.0, 
+                starchVol: 2.0, 
+                nahso3Vol: 9.0,
+                totalVol: 23.0,
+                trials: [null, null, null] 
+            },
+            { 
+                id: 3, 
+                name: '시험관 (다)', 
+                kio3Vol: 9.0, 
+                waterVol: 3.0, 
+                starchVol: 2.0, 
+                nahso3Vol: 9.0,
+                totalVol: 23.0,
+                trials: [null, null, null] 
+            },
+            { 
+                id: 4, 
+                name: '시험관 (라)', 
+                kio3Vol: 12.0, 
+                waterVol: 0.0, 
+                starchVol: 2.0, 
+                nahso3Vol: 9.0,
+                totalVol: 23.0,
+                trials: [null, null, null] 
+            }
+        ];
+
+        let experimentData = JSON.parse(JSON.stringify(defaultConditions));
+
+        // Timer Variables
+        let timerInterval = null;
+        let startTime = 0;
+        let elapsedTime = 0;
+        let isRunning = false;
+
+        // Chart Reference
+        let chartInstance = null;
+        let activeGraphType = 'time'; // 'time' or 'rate'
+
+        // Initialize Lucide Icons & App
+        document.addEventListener('DOMContentLoaded', () => {
+            lucide.createIcons();
+            renderTable();
+            initChart();
+            updateSummaryCard();
+            generatePythonCode();
+            updateTab2GeminiPrompt();
+            
+            // Set current date
+            const today = new Date();
+            document.getElementById('cardDate').textContent = `${today.getFullYear()}.${String(today.getMonth() + 1).padStart(2, '0')}.${String(today.getDate()).padStart(2, '0')}`;
+
+            // Group selector listener
+            document.getElementById('groupSelect').addEventListener('change', (e) => {
+                document.getElementById('cardGroupBadge').textContent = `${e.target.value} 모둠`;
+                generatePythonCode();
+                updateTab2GeminiPrompt();
+            });
+        });
+
+        // --- TAB SWITCHING LOGIC ---
+        function switchTab(tabNum) {
+            const tab1Content = document.getElementById('tab1Content');
+            const tab2Content = document.getElementById('tab2Content');
+            const tab1Btn = document.getElementById('tab1Btn');
+            const tab2Btn = document.getElementById('tab2Btn');
+
+            if (tabNum === 1) {
+                tab1Content.classList.remove('hidden');
+                tab2Content.classList.add('hidden');
+                tab1Btn.className = "px-4 py-2 text-sm font-bold border-b-2 border-white text-white flex items-center gap-2";
+                tab2Btn.className = "px-4 py-2 text-sm font-medium border-b-2 border-transparent text-indigo-200 hover:text-white flex items-center gap-2";
+            } else {
+                tab1Content.classList.add('hidden');
+                tab2Content.classList.remove('hidden');
+                tab2Btn.className = "px-4 py-2 text-sm font-bold border-b-2 border-white text-white flex items-center gap-2";
+                tab1Btn.className = "px-4 py-2 text-sm font-medium border-b-2 border-transparent text-indigo-200 hover:text-white flex items-center gap-2";
+                generatePythonCode();
+                updateTab2GeminiPrompt();
+            }
+        }
+
+        // --- TIMER FUNCTIONS ---
+        function startTimer() {
+            if (isRunning) return;
+            
+            isRunning = true;
+            startTime = Date.now() - elapsedTime;
+            timerInterval = setInterval(updateTimerDisplay, 10);
+
+            document.getElementById('timerStatus').textContent = '측정 중...';
+            document.getElementById('timerStatus').className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-700 animate-pulse';
+
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('startBtn').classList.add('opacity-50', 'cursor-not-allowed');
+
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('stopBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        function stopTimer() {
+            if (!isRunning) return;
+
+            isRunning = false;
+            clearInterval(timerInterval);
+
+            document.getElementById('timerStatus').textContent = '측정 완료';
+            document.getElementById('timerStatus').className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-100 text-rose-700';
+
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('startBtn').classList.remove('opacity-50', 'cursor-not-allowed');
+
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('stopBtn').classList.add('opacity-50', 'cursor-not-allowed');
+        }
+
+        function resetTimer() {
+            stopTimer();
+            elapsedTime = 0;
+            document.getElementById('timeDisplay').textContent = '00:00.00';
+            document.getElementById('timerStatus').textContent = '대기 중';
+            document.getElementById('timerStatus').className = 'text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600';
+        }
+
+        function updateTimerDisplay() {
+            elapsedTime = Date.now() - startTime;
+            
+            const totalSec = Math.floor(elapsedTime / 1000);
+            const minutes = Math.floor(totalSec / 60);
+            const seconds = totalSec % 60;
+            const centiseconds = Math.floor((elapsedTime % 1000) / 10);
+
+            const formattedMins = String(minutes).padStart(2, '0');
+            const formattedSecs = String(seconds).padStart(2, '0');
+            const formattedCents = String(centiseconds).padStart(2, '0');
+
+            document.getElementById('timeDisplay').textContent = `${formattedMins}:${formattedSecs}.${formattedCents}`;
+        }
+
+        function applyTimerToTable() {
+            const timeInSeconds = parseFloat((elapsedTime / 1000).toFixed(2));
+            if (timeInSeconds <= 0) {
+                showToast('스톱워치를 먼저 가동하여 시간을 측정해주세요!');
+                return;
+            }
+
+            const conditionIdx = parseInt(document.getElementById('targetCondition').value);
+            const trialIdx = parseInt(document.getElementById('targetTrial').value) - 1;
+
+            experimentData[conditionIdx].trials[trialIdx] = timeInSeconds;
+            renderTable();
+            updateChart();
+            updateSummaryCard();
+            generatePythonCode();
+            updateTab2GeminiPrompt();
+            showToast(`${experimentData[conditionIdx].name} ${trialIdx + 1}차 측정값(${timeInSeconds}초)이 입력되었습니다.`);
+        }
+
+        // --- CALCULATIONS ---
+        function getInitialConc(kio3Vol, totalVol) {
+            return parseFloat(((0.05 * kio3Vol) / totalVol).toFixed(4));
+        }
+
+        function calculateAverage(trials) {
+            const validTrials = trials.filter(t => t !== null && !isNaN(t) && t > 0);
+            if (validTrials.length === 0) return null;
+            const sum = validTrials.reduce((acc, curr) => acc + curr, 0);
+            return parseFloat((sum / validTrials.length).toFixed(2));
+        }
+
+        function calculateRate(avgTime) {
+            if (!avgTime || avgTime === 0) return null;
+            return parseFloat((1 / avgTime).toFixed(4));
+        }
+
+        function calculateRelativeRate(avgTime, baseAvgTime) {
+            if (!avgTime || !baseAvgTime || avgTime === 0) return null;
+            const rateCurrent = 1 / avgTime;
+            const rateBase = 1 / baseAvgTime;
+            return parseFloat((rateCurrent / rateBase).toFixed(2));
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('dataTableBody');
+            tbody.innerHTML = '';
+
+            const baseAvg = calculateAverage(experimentData[0].trials);
+
+            experimentData.forEach((row, idx) => {
+                const avg = calculateAverage(row.trials);
+                const rate = calculateRate(avg);
+                const initConc = getInitialConc(row.kio3Vol, row.totalVol);
+                const relConc = (row.kio3Vol / 3.0).toFixed(1); 
+                const relRate = calculateRelativeRate(avg, baseAvg);
+
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100 hover:bg-slate-50 transition';
+
+                tr.innerHTML = `
+                    <td class="p-2.5 font-bold text-slate-800">
+                        ${row.name}
+                        <span class="block text-[10px] text-slate-400 font-normal">상대농도: ${relConc}</span>
+                    </td>
+                    <td class="p-2 text-[11px] text-slate-600">
+                        <div>A: KIO₃ ${row.kio3Vol}mL + 물 ${row.waterVol}mL</div>
+                        <div class="text-slate-400">B: 녹말 ${row.starchVol}mL + NaHSO₃ ${row.nahso3Vol}mL</div>
+                    </td>
+                    <td class="p-2.5 text-center font-mono font-semibold text-slate-700">
+                        ${initConc} M
+                    </td>
+                    <td class="p-2 text-center">
+                        <input type="number" step="0.01" value="${row.trials[0] !== null ? row.trials[0] : ''}" 
+                            onchange="updateTrialValue(${idx}, 0, this.value)"
+                            placeholder="-" class="w-14 text-center bg-white border border-slate-200 rounded py-1 text-xs focus:ring-2 focus:ring-indigo-400 focus:outline-none">
+                    </td>
+                    <td class="p-2 text-center">
+                        <input type="number" step="0.01" value="${row.trials[1] !== null ? row.trials[1] : ''}" 
+                            onchange="updateTrialValue(${idx}, 1, this.value)"
+                            placeholder="-" class="w-14 text-center bg-white border border-slate-200 rounded py-1 text-xs focus:ring-2 focus:ring-indigo-400 focus:outline-none">
+                    </td>
+                    <td class="p-2 text-center">
+                        <input type="number" step="0.01" value="${row.trials[2] !== null ? row.trials[2] : ''}" 
+                            onchange="updateTrialValue(${idx}, 2, this.value)"
+                            placeholder="-" class="w-14 text-center bg-white border border-slate-200 rounded py-1 text-xs focus:ring-2 focus:ring-indigo-400 focus:outline-none">
+                    </td>
+                    <td class="p-2.5 text-center font-bold text-indigo-700 bg-indigo-50/40">
+                        ${avg !== null ? avg + ' s' : '-'}
+                    </td>
+                    <td class="p-2.5 text-center font-bold text-emerald-700 bg-emerald-50/40">
+                        ${relRate !== null ? relRate : (rate !== null ? rate + ' s⁻¹' : '-')}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateTrialValue(condIdx, trialIdx, value) {
+            const valNum = parseFloat(value);
+            experimentData[condIdx].trials[trialIdx] = isNaN(valNum) ? null : valNum;
+            renderTable();
+            updateChart();
+            updateSummaryCard();
+            generatePythonCode();
+            updateTab2GeminiPrompt();
+        }
+
+        function resetAllData() {
+            experimentData = JSON.parse(JSON.stringify(defaultConditions));
+            renderTable();
+            updateChart();
+            updateSummaryCard();
+            generatePythonCode();
+            updateTab2GeminiPrompt();
+            showToast('모든 측정 데이터가 초기화되었습니다.');
+        }
+
+        // --- CHART FUNCTIONS ---
+        function initChart() {
+            const ctx = document.getElementById('reactionChart').getContext('2d');
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: getChartData(),
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: {
+                                font: { family: 'Pretendard', size: 11 }
+                            }
+                        },
+                        tooltip: {
+                            mode: 'index',
+                            intersect: false,
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: '시험관 (KIO₃ 부피: mL)',
+                                font: { family: 'Pretendard', size: 12, weight: 'bold' }
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: activeGraphType === 'time' ? '평균 반응 시간 (초)' : '상대 반응 속도',
+                                font: { family: 'Pretendard', size: 12, weight: 'bold' }
+                            },
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+
+        function getChartData() {
+            const labels = experimentData.map(d => `${d.name} (${d.kio3Vol}mL)`);
+            const baseAvg = calculateAverage(experimentData[0].trials);
+            
+            if (activeGraphType === 'time') {
+                const dataValues = experimentData.map(d => calculateAverage(d.trials));
+                return {
+                    labels: labels,
+                    datasets: [{
+                        label: '평균 반응 시간 (s)',
+                        data: dataValues,
+                        borderColor: '#4f46e5',
+                        backgroundColor: 'rgba(79, 70, 229, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.2,
+                        pointBackgroundColor: '#4f46e5',
+                        pointRadius: 6
+                    }]
+                };
+            } else {
+                const dataValues = experimentData.map(d => {
+                    const avg = calculateAverage(d.trials);
+                    return calculateRelativeRate(avg, baseAvg) || calculateRate(avg);
+                });
+                return {
+                    labels: labels,
+                    datasets: [{
+                        label: '반응 속도 상대값 (또는 1/t)',
+                        data: dataValues,
+                        borderColor: '#059669',
+                        backgroundColor: 'rgba(5, 150, 105, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.2,
+                        pointBackgroundColor: '#059669',
+                        pointRadius: 6
+                    }]
+                };
+            }
+        }
+
+        function updateChart() {
+            if (!chartInstance) return;
+            chartInstance.data = getChartData();
+            chartInstance.options.scales.y.title.text = activeGraphType === 'time' ? '평균 반응 시간 (초)' : '상대 반응 속도';
+            chartInstance.update();
+        }
+
+        function toggleGraphType(type) {
+            activeGraphType = type;
+            const btnTime = document.getElementById('btnShowTime');
+            const btnRate = document.getElementById('btnShowRate');
+
+            if (type === 'time') {
+                btnTime.className = 'px-3 py-1 rounded-md bg-white text-indigo-600 shadow-sm font-bold';
+                btnRate.className = 'px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 font-normal';
+            } else {
+                btnRate.className = 'px-3 py-1 rounded-md bg-white text-emerald-600 shadow-sm font-bold';
+                btnTime.className = 'px-3 py-1 rounded-md text-slate-600 hover:text-slate-900 font-normal';
+            }
+
+            updateChart();
+        }
+
+        // --- SUMMARY & EXPORT LOGIC ---
+        function updateSummaryCard() {
+            const container = document.getElementById('cardSummaryText');
+            container.innerHTML = '';
+            const baseAvg = calculateAverage(experimentData[0].trials);
+
+            experimentData.forEach(item => {
+                const avg = calculateAverage(item.trials);
+                const relRate = calculateRelativeRate(avg, baseAvg);
+                const div = document.createElement('div');
+                div.className = 'bg-white/5 p-2 rounded border border-white/10';
+                div.innerHTML = `
+                    <span class="text-indigo-300 font-bold">${item.name}:</span>
+                    <span class="text-white">${avg !== null ? avg + 's' : '미측정'}</span>
+                    <span class="text-emerald-400 text-[10px] block">${relRate !== null ? '상대속도: ' + relRate : ''}</span>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        function generateSummaryText() {
+            const groupNum = document.getElementById('groupSelect').value;
+            const temp = document.getElementById('tempInput').value;
+
+            let text = `[아이오딘 시계반응 실험 결과 - ${groupNum}모둠]\n`;
+            text += `실험 온도: ${temp}°C\n`;
+            text += `------------------------------------\n`;
+
+            const baseAvg = calculateAverage(experimentData[0].trials);
+
+            experimentData.forEach(item => {
+                const avg = calculateAverage(item.trials);
+                const initConc = getInitialConc(item.kio3Vol, item.totalVol);
+                const relRate = calculateRelativeRate(avg, baseAvg);
+                text += `${item.name} (KIO3 ${item.kio3Vol}mL / 초기농도 ${initConc}M) => 평균시간: ${avg !== null ? avg + '초' : '미측정'}, 상대속도: ${relRate !== null ? relRate : '-'}\n`;
+            });
+
+            text += `------------------------------------\n`;
+            text += `결론: KIO3의 부피(농도)가 3.0mL -> 12.0mL로 증가함에 따라 반응 시간이 감소하고 반응 속도가 증가함.`;
+            return text;
+        }
+
+        function copySummaryToClipboard() {
+            const summaryText = generateSummaryText();
+            copyToClipboardText(summaryText);
+            showToast('모둠 데이터 요약이 클립보드에 복사되었습니다! 패들렛에 붙여넣기(Ctrl+V) 하세요.');
+        }
+
+        // --- 2차시: COLAB PYTHON CODE GENERATION ---
+        function generatePythonCode() {
+            const groupNum = document.getElementById('groupSelect').value;
+            const baseAvg = calculateAverage(experimentData[0].trials);
+
+            const concs = [];
+            const rates = [];
+            const times = [];
+            let hasMissing = false;
+
+            experimentData.forEach(d => {
+                const initConc = getInitialConc(d.kio3Vol, d.totalVol);
+                const avg = calculateAverage(d.trials);
+                concs.push(initConc);
+                if (avg !== null) {
+                    times.push(avg);
+                    const relRate = calculateRelativeRate(avg, baseAvg);
+                    rates.push(relRate || calculateRate(avg));
+                } else {
+                    times.push(0);
+                    rates.push(0);
+                    hasMissing = true;
+                }
+            });
+
+            // Status Badge Update
+            const badge = document.getElementById('dataStatusBadge');
+            if (hasMissing) {
+                badge.textContent = '일부 결측치 있음 (미완성 데이터)';
+                badge.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800';
+            } else {
+                badge.textContent = '결측치 없음 (시각화 준비 완료)';
+                badge.className = 'text-xs font-bold px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800';
+            }
+
+            const code = `# [${groupNum}모둠] 아이오딘 시계반응 농도-반응속도 분석 파이썬 코드
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 1. 수집한 실험 데이터 (KIO3 초기 농도 및 상대 반응 속도)
+concentrations = np.array([${concs.join(', ')}])  # Molarity (M)
+reaction_rates = np.array([${rates.join(', ')}])   # Relative Reaction Rates
+
+# 2. 산점도 및 선형 추세선(1차 회귀) 계산
+slope, intercept = np.polyfit(concentrations, reaction_rates, 1)
+trendline = slope * concentrations + intercept
+
+# 결정계수 R² 계산
+correlation_matrix = np.corrcoef(concentrations, reaction_rates)
+r_squared = correlation_matrix[0, 1]**2
+
+# 3. 데이터 시각화 (산점도 및 추세선)
+plt.figure(figsize=(8, 5))
+plt.scatter(concentrations, reaction_rates, color='red', s=100, zorder=5, label='실험 데이터 산점도')
+plt.plot(concentrations, trendline, color='blue', linestyle='--', linewidth=2, 
+         label=f'추세선: y = {slope:.2f}x + {intercept:.2f} (R² = {r_squared:.4f})')
+
+plt.title(f'[{groupNum}모둠] KIO3 초기 농도에 따른 반응 속도 관계', fontsize=14, fontweight='bold')
+plt.xlabel('KIO3 초기 농도 (M)', fontsize=12)
+plt.ylabel('상대 반응 속도 (Relative Rate)', fontsize=12)
+plt.grid(True, linestyle=':', alpha=0.6)
+plt.legend(fontsize=11)
+plt.show()
+
+print(f"추세선 방정식: y = {slope:.4f}x + {intercept:.4f}")
+print(f"결정계수 R²: {r_squared:.4f}")
+`;
+
+            document.getElementById('pythonCodeDisplay').textContent = code;
+        }
+
+        function copyPythonCode() {
+            const code = document.getElementById('pythonCodeDisplay').textContent;
+            copyToClipboardText(code);
+            showToast('Colab 파이썬 코드가 복사되었습니다! Google Colab에 붙여넣으세요.');
+        }
+
+        // --- 2차시: GEMINI PROMPT GENERATION (Colab Correlation Focus) ---
+        function updateTab2GeminiPrompt() {
+            const groupNum = document.getElementById('groupSelect').value;
+            const temp = document.getElementById('tempInput').value;
+            const userTrend = document.getElementById('trendFormulaInput').value.trim();
+            const userR2 = document.getElementById('rSquaredInput').value.trim();
+
+            const baseAvg = calculateAverage(experimentData[0].trials);
+            let dataSummary = experimentData.map(d => {
+                const avg = calculateAverage(d.trials);
+                const initConc = getInitialConc(d.kio3Vol, d.totalVol);
+                const relRate = calculateRelativeRate(avg, baseAvg);
+                return `- ${d.name} [KIO3 농도: ${initConc}M]: 평균시간 ${avg !== null ? avg + 's' : '미측정'}, 상대속도 ${relRate !== null ? relRate : '-'}`;
+            }).join('\n');
+
+            let trendInfo = userTrend ? `도출된 추세선 수식: ${userTrend}` : `(Colab 코드 실행 시 추세선 수식이 자동 산출됩니다)`;
+            let r2Info = userR2 ? `결정계수(${userR2})` : ``;
+
+            const prompt = `안녕하세요 Gemini! 화학1 '아이오딘 시계 반응' 탐구 2차시 수업을 진행 중인 ${groupNum}모둠입니다.
+
+우리가 구글 코랩(Colab)을 통해 농도와 반응 속도 데이터의 산점도를 그리고 추세선을 도출했습니다. 다음 데이터를 바탕으로 시각화 결과를 과학적으로 해석해 주세요.
+
+[모둠 데이터 및 Colab 도출 결과]
+- 실험 온도: ${temp}°C
+- 모둠 데이터 목록:
+${dataSummary}
+- ${trendInfo} ${r2Info}
+
+[2차시 분석 토의 질문]
+1. 추세선의 기울기(slope)가 양(+)의 값을 갖는 것은 '반응물 농도'와 '반응 속도' 사이에 어떤 상관관계가 있음을 의미하나요?
+2. 추세선 수식을 바탕으로 이 아이오딘 시계반응에서 반응물(KIO3) 농도에 대한 반응 차수(Order of Reaction)를 추론해 주세요.
+3. 데이터의 결정계수(R²)나 산점도와 추세선 사이의 미세한 오차가 발생하는 화학적/실험적 원인은 무엇인가요?
+4. 이를 바탕으로 '농도가 진할수록 반응 속도가 빨라진다'는 규칙성을 일상생활(예: 음식 부패, 의약품 작용 등)에 적용하는 예시 2가지를 설명해 주세요.`;
+
+            document.getElementById('tab2GeminiPromptText').value = prompt;
+        }
+
+        function copyTab2GeminiPrompt() {
+            const prompt = document.getElementById('tab2GeminiPromptText').value;
+            copyToClipboardText(prompt);
+            showToast('Gemini 2차시 분석 프롬프트가 복사되었습니다!');
+        }
+
+        // Safe Clipboard Fallback
+        function copyToClipboardText(text) {
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(text).catch(() => {
+                    fallbackCopy(text);
+                });
+            } else {
+                fallbackCopy(text);
+            }
+        }
+
+        function fallbackCopy(text) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+            } catch (err) {
+                console.error('Copy failed', err);
+            }
+            document.body.removeChild(textArea);
+        }
+
+        // Toast Helper
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = msg;
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-0', 'opacity-100');
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
